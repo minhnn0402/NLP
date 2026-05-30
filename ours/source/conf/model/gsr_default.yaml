@@ -1,0 +1,32 @@
+# Text Encoder configuration
+# Fine-tuning strategy: "full" (all params), "lora" (adapter), "frozen" (legacy)
+text_encoder:
+  name: "BAAI/bge-large-en-v1.5"    # 335M params, d=1024
+  finetune: "lora"                   # "full" | "lora" | "frozen"
+  lora_r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  max_length: 512
+  pooling: "cls"                     # "cls" | "mean"
+  gradient_checkpointing: false
+
+# Embedding model for inference (used by benchmark_gsr.py)
+embedding:
+  name: "intfloat/multilingual-e5-large-instruct"
+  device: "auto"          # "auto" | "cuda" | "cpu"
+  batch_size: 32
+  normalize: true
+
+# GAT encoder (§4.3)
+gat:
+  hidden_dim: 256
+  num_heads: 4
+  num_layers: 2
+  dropout: 0.1
+
+# Joint scorer (§4.4)
+scorer:
+  text_embed_dim: 1024    # auto-detected from text_encoder at runtime
+  kg_embed_dim: 256       # must match gat.hidden_dim
+  entity_feat_dim: 3      # company, year, sector
+  hidden_dim: 64

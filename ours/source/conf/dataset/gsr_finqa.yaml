@@ -1,0 +1,22 @@
+name: "G4KMU/t2-ragbench"
+config_name: "FinQA"
+eval_split: "test"
+train_split: "train"
+language: "en"
+meta_data_keys:
+  - report_year
+  - company_name
+  - company_sector
+context_key: "context"
+question_key: "question"
+
+# GSR-specific parameters
+gsr:
+  alpha: 0.5     # text similarity weight
+  beta: 0.3      # entity matching weight
+  gamma: 0.2     # constraint score weight
+  gat_hidden_dim: 256
+  gat_num_heads: 4
+  gat_num_layers: 2
+  epsilon: 1.0e-4   # constraint tolerance
+  top_k: 3

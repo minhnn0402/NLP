@@ -1,0 +1,21 @@
+name: "G4KMU/t2-ragbench"
+config_name: "ConvFinQA"
+eval_split: "turn_0"     # ConvFinQA only has turn_0 split
+train_split: "turn_0"
+language: "en"
+meta_data_keys:
+  - report_year
+  - company_name
+  - company_sector
+context_key: "context"
+question_key: "question"
+
+gsr:
+  alpha: 0.5
+  beta: 0.3
+  gamma: 0.2
+  gat_hidden_dim: 256
+  gat_num_heads: 4
+  gat_num_layers: 2
+  epsilon: 1.0e-4
+  top_k: 3
