@@ -7,17 +7,19 @@
 
 ## 0. Một câu chuyện, một gap, hai contribution
 
-**Research gap (thống nhất).** Trong truy hồi tài liệu tài chính (text + bảng), tín hiệu quyết định *relevance* là **mịn** — bộ ba *(thực thể, kỳ báo cáo, đại lượng/độ lớn)* — nhưng (i) bị **ngữ nghĩa dùng-chung nhấn chìm** trong một vector tổng (*granularity dilemma* [Xu et al., Findings EMNLP 2025]) và (ii) bị **tokenization phá huỷ độ lớn số** (*numeracy gap* [Findings EACL 2026]). Hệ quả đo được trên T²-RAGBench: tài liệu *sai* được chấm cao hơn tài liệu *đúng* ở 59.5% truy vấn; khoảng cách tương đồng (đúng−sai) **âm** (−0.027); same-company tương đồng **2.82×** inter-company. **Chưa phương pháp nào biến các khóa mịn này thành *first-class* đồng thời ở cả inference lẫn training** — dense giữ single-vector, BM25/ColBERT coi số như token, *Numbers Matter!* đòi điều kiện số tường minh trong query.
+**Research gap (thống nhất).** Trong truy hồi tài liệu tài chính (text + bảng), tín hiệu quyết định *relevance* là **mịn** — bộ ba *(thực thể, kỳ báo cáo, đại lượng/độ lớn)* — nhưng (i) bị **ngữ nghĩa dùng-chung nhấn chìm** trong một vector tổng (*granularity dilemma* [Xu et al., Findings EMNLP 2025]) và (ii) bị **tokenization phá huỷ độ lớn số** (*numeracy gap* [Findings EACL 2026]). Hệ quả đo được trên T²-RAGBench: tài liệu *sai* được chấm cao hơn tài liệu *đúng* ở 59.5% truy vấn; khoảng cách tương đồng (đúng−sai) **âm** (−0.027); same-company tương đồng **2.82×** inter-company. Theo hiểu biết của chúng tôi (*to our knowledge*), **chưa phương pháp nào biến các khóa mịn này thành *first-class* đồng thời ở cả inference lẫn training** — dense giữ single-vector, BM25/ColBERT coi số như token, *Numbers Matter!* đòi điều kiện số tường minh trong query.
+
+**Pitch (một nguyên lý, không phải một kiến trúc nhiều module — theo "AAAI Chair take" của review 2).** *Relevance trong tài liệu tài chính được đánh chỉ mục theo **fact**, không phải theo **document**: tài liệu đúng là tài liệu chứa đúng* (concept, entity, period, value) *fact trả lời câu hỏi. LEDGER biến **fact keys** thành first-class ở cả suy luận lẫn huấn luyện.*
 
 **Thesis.** Đưa bộ khóa mịn lên *first-class* ở **hai cấp**:
 
 - **C1 — Disentangled fact-grounded retrieval với định tuyến entity–time (inference-time).**
-  Tách biểu diễn thành *concept ⟂ magnitude ⟂ khóa rời rạc*, đối sánh ở **cấp fact** bằng **gated typed late interaction**, và — mấu chốt để khả thi & không "giòn" — **hợp nhất lọc rời rạc vào chính chỉ mục vector** (metadata-routed masked search) kèm **soft fallback**.
+  Tách biểu diễn thành *concept ⟂ magnitude ⟂ khóa rời rạc*, đối sánh ở **cấp fact** bằng **gated typed late interaction**, và — để khả thi & không "giòn" — **hợp nhất lọc rời rạc vào chính chỉ mục vector** (metadata-routed masked search) kèm **soft fallback**. *(Masked search là **cơ chế hiện thực** mượn từ filtered-ANN, không phải claim novelty; novelty của C1 là **biểu diễn tách kênh + đối sánh fact-level có cổng**.)*
   *Giải:* granularity dilemma + numeracy gap *tại thời điểm truy hồi*, một cách **scalable và robust**.
 
-- **C2 — Ledger-grounded provably-true contrastive learning (training-time).**
-  Nhiễu loạn có cấu trúc trên ledger của tài liệu vàng để sinh hard negative **chắc chắn đúng (provably-true)**: *period / entity / **metric** / scale / value-identity swap*. Mỗi loại huấn luyện đúng một kênh/cổng của C1.
-  *Giải:* hard-negative mining cho corpus near-duplicate (theo thời gian/thực thể) **không bị nhiễu false-negative** — điều mà mining cổ điển phải lọc tốn kém.
+- **C2 — Ledger-grounded, channel-aligned hard negatives (training-time).**
+  Nhiễu loạn có cấu trúc trên ledger của tài liệu vàng để sinh hard negative **answer-invalidating** (vô hiệu hoá đáp án — *dưới giả định ledger-answer*, §4.3): *period / entity / **metric** / scale / value-identity swap*. **Mỗi loại căn chỉnh (align) với đúng một kênh/cổng của C1** — đây là điểm đóng đinh của C2, không phải bản thân masked index.
+  *Giải:* hard-negative cho corpus near-duplicate (theo thời gian/thực thể) **giảm tối đa nhiễu false-negative** — đúng vùng mining cổ điển nguy hiểm nhất.
 
 **Vì sao hai contribution gắn chặt (yêu cầu cốt lõi).**
 C2 định nghĩa negative *trên chính fact ledger mà C1 dùng*; và **mỗi loại negative của C2 cấp gradient cho đúng một thành phần của C1**:
@@ -47,7 +49,7 @@ Cả C1 và C2 đứng trên một biểu diễn trung gian symbolic.
 
 ---
 
-## 2. Motivation: vì sao single-vector *nhất thiết* thua (đã hạ cấp từ "định lý" → phân tích có đo đạc)
+## 2. Motivation: *khi nào* single-vector thất bại (phân tích chẩn đoán, không phải định lý)
 
 > **Phản hồi review 1.1 & 2.§2:** không tuyên bố đây là đóng góp lý thuyết phổ quát. Đây là *mô hình giải thích lý tưởng hoá* (assumption minh bạch) **đi kèm thí nghiệm xác nhận**.
 
@@ -60,7 +62,7 @@ $\Delta=\langle\mathbf u_{\text{id}}(\tilde e,\tilde t),\,\mathbf u_{\text{id}}(
 1. **Linear probe:** từ embedding tài liệu, probe dự đoán *(entity, year)* vs *(sector/topic)*. Dự đoán: acc(topic) cao ≫ acc(entity,year) → bằng chứng *trực tiếp* cho $\Sigma_{\text{top}}\gg\Sigma_{\text{id}}$ (không chỉ gián tiếp qua 2.82×).
 2. **Ước lượng phương sai theo trục:** chiếu embedding lên không gian topic vs identity (dùng nhãn sector vs (company,year)), đo $\widehat\Sigma_{\text{top}},\widehat\Sigma_{\text{id}}$ thực trên T²-RAGBench.
 
-Kết luận §2: ta gọi đây là **"diagnostic analysis"**, dùng để *thúc đẩy thiết kế cổng nhân ở §3.2*, không phải để khoe định lý. Cổng nhân biến tín hiệu phân biệt từ *số hạng cộng (bị nhấn chìm)* thành *thừa số (không thể bị nhấn)* — đó là nội dung kỹ thuật thực sự.
+Kết luận §2: ta gọi đây là **"diagnostic analysis"**, dùng để *thúc đẩy thiết kế cổng nhân ở §3.2*, không phải để khoe định lý. Cổng nhân chuyển tín hiệu phân biệt từ *số hạng cộng (dễ bị lấn át)* thành *thừa số (ít khả năng bị lấn át — less likely to be dominated)* — đó là nội dung kỹ thuật thực sự. **Quy ước trình bày (review 1.4):** nếu probe cho tương phản mạnh (vd acc(topic) > 90% ≫ acc(entity,year) < 40%), giữ §2 ở phần chính; nếu không, nén §2 còn ~1 trang và đẩy phần lớn xuống Appendix để nhường chỗ cho C1 & thực nghiệm.
 
 ---
 
@@ -97,7 +99,7 @@ $\sigma_m=\mathrm{ReLU}(\cos)^{1/\tau_m}$; $\gamma_t(\tilde t,t)=\exp(-|\tilde t
 
 ---
 
-## 4. Contribution 2 — Ledger-grounded provably-true contrastive learning
+## 4. Contribution 2 — Ledger-grounded, channel-aligned hard negatives
 
 ### 4.1. Negative cấu trúc, sinh trên ledger của $d^+$
 - **period-swap** $d^-_t$: đổi $t\to t'$ — near-duplicate khác kỳ (thủ phạm EDA #1).
@@ -108,14 +110,22 @@ $\sigma_m=\mathrm{ReLU}(\cos)^{1/\tau_m}$; $\gamma_t(\tilde t,t)=\exp(-|\tilde t
 
 ### 4.2. Mục tiêu & ánh xạ gradient (chính là chỗ C1–C2 lồng nhau)
 $$
-\mathcal L_{\text{ret}}=-\log\frac{e^{S(q,d^+)/\tau}}{e^{S(q,d^+)/\tau}+\sum_{d^-\in\mathcal N(q)}e^{S(q,d^-)/\tau}},\quad \mathcal N(q)=\text{in-batch}\cup\{d^-_t,d^-_e,d^-_m,d^-_s\}.
+\mathcal L_{\text{ret}}=-\log\frac{e^{S(q,d^+)/\tau}}{e^{S(q,d^+)/\tau}+\sum_{d^-\in\mathcal N(q)}e^{S(q,d^-)/\tau}},\quad \mathcal N(q)=\text{in-batch}\cup\{d^-_t,d^-_e,d^-_m,d^-_s,d^-_v\}.
 $$
 Vì mỗi $d^-$ chỉ khác $d^+$ ở **một** khía cạnh, gradient InfoNCE dồn vào **đúng** thành phần tương ứng của $S$ (bảng ở §0) → mỗi kênh/cổng được giám sát riêng biệt, sạch.
 
-### 4.3. Tính chất provably-true (đóng góp được cả 2 review đánh giá cao nhất)
-**Mệnh đề.** Gọi $f^\star\in\mathcal L(d^+)$ là fact trả lời $q$. Phép nhiễu loạn $\pi$ thay đổi *chính khóa/giá trị* của $f^\star$ (năm, thực thể, concept, hoặc value), nên đáp án vàng không còn truy được từ $\pi(d^+)$; do đó $\pi(d^+)$ **chắc chắn không liên quan** đến $q$. ⇒ $\mathcal N(q)$ **không chứa false negative theo cấu trúc**. $\square$
+### 4.3. Tính chất *answer-invalidating* (phát biểu có giả định — tránh chữ "provably")
+> **Phản hồi review 2 (line 115):** "provably-true" quá mạnh. Với query so sánh/tổng hợp/ratio (nhiều fact thay thế), đổi *một* fact không luôn khiến tài liệu vô-liên-quan. Ta phát biểu lại có giả định rõ.
 
-**Vì sao đây là gap thật:** mining hard-negative cổ điển (RocketQA, NV-Retriever) phải dùng cross-encoder/LLM lọc false negative (tới ~70% top-similar trên MS-MARCO là positive thật). Trên corpus tài chính, same-company-other-year *vừa cực hard vừa rủi ro false-negative cao nhất* — đúng nơi mining cổ điển nguy hiểm nhất, thì perturbation-trên-ledger lại **đảm bảo đúng**. Ta tổng quát hoá thành nguyên tắc: *khi có một "view" symbolic của tài liệu, hãy perturb phần-tử-mang-đáp-án để tổng hợp hard negative true-by-construction* — áp dụng cho mọi corpus versioned/structured, không riêng tài chính.
+**Giả định (ledger-answer).** $q$ được trả lời bởi một tập fact xác định $\mathcal A(q)\subseteq\mathcal L(d^+)$ (thường $|\mathcal A(q)|=1$ với query tra cứu; một cặp với query đa kỳ).
+
+**Mệnh đề (answer-invalidating negatives).** Nếu phép nhiễu $\pi$ thay đổi khóa/giá trị của **mọi** fact trong $\mathcal A(q)$, thì đáp án vàng không còn truy được từ $\pi(d^+)$ ⇒ $\pi(d^+)$ **không còn là positive** cho $q$. Khi $|\mathcal A(q)|=1$ (đa số FinQA tra-cứu) đây là **true negative theo cấu trúc**; với query đa-fact, ta yêu cầu $\pi$ phá *toàn bộ* $\mathcal A(q)$ (đảm bảo qua perturb theo cấu trúc kỳ ở §5). $\square$
+
+**Hai cảnh báo minh bạch (review 1.3 & 2):**
+1. **Trùng giá trị ngẫu nhiên:** metric-swap (vd Revenue↔Total Equity) phải **kiểm tra** $v_m\neq v_{m'}$ trước khi nhận làm negative — nếu trùng, perturb không vô hiệu hoá đáp án → loại bỏ, tránh tạo *positive giả*.
+2. **Học theo miền giá trị:** metric-swap có thể khiến mô hình phân biệt concept dựa vào *miền độ lớn điển hình* (Total Equity thường ≫ Revenue) thay vì ngữ nghĩa thuần. Ta thảo luận thẳng: điều này *có lợi* cho retrieval (phản ánh thực tế) nhưng phải đo bằng một **probe concept-only** để tách phần do ngữ nghĩa vs phần do magnitude.
+
+**Vì sao là gap thật (điểm đóng đinh của C2):** mining cổ điển (RocketQA, NV-Retriever) phải dùng cross-encoder/LLM lọc false negative (~70% top-similar trên MS-MARCO là positive thật). Trên tài chính, same-company-other-year *vừa cực hard vừa rủi ro false-negative cao nhất*; perturbation-trên-ledger cho negative **answer-invalidating** ngay tại vùng nguy hiểm đó, và **căn chỉnh từng kênh scoring**. Nguyên tắc tổng quát: *khi có một "view" symbolic, perturb phần-tử-mang-đáp-án để tổng hợp negative answer-invalidating, align từng kênh* — cho mọi corpus versioned/structured. **Đây (không phải masked index) là claim novelty trung tâm của paper.**
 
 ---
 
@@ -126,14 +136,16 @@ Vì mỗi $d^-$ chỉ khác $d^+$ ở **một** khía cạnh, gradient InfoNCE d
 
 ---
 
-## 6. Extension (không phải contribution lõi): tái dùng ledger cho sinh có kiểm chứng
-Ngắn gọn, để cho thấy *tính tái dụng của ledger*: generator nhận top-K + fact đã trích; **verifier** dùng *cùng* ledger kiểm tra (i) value grounding, (ii) đồng nhất thức kế toán $|f_c(\mathbf v)|>\tau_c$ *khi áp dụng được*, (iii) khớp phép toán; **tiered DPO** (accuracy ưu tiên tuyệt đối) tinh chỉnh. Đây là nơi đồng nhất thức kế toán (bản cũ) thực sự hữu ích — như *verifier*, không phải tín hiệu xếp hạng. Trình bày 1 mục, không chiếm trọng tâm.
+## 6. Downstream analysis (Appendix — *không* phải contribution lõi)
+> **Phản hồi review 2 (line 129):** để phần này ở Appendix / "downstream analysis" (≤½ trang), tránh để reviewer nghĩ bài ôm thêm RAG generation.
+
+Chỉ để minh hoạ *tính tái dụng của ledger*: generator nhận top-K + fact đã trích; **verifier** dùng *cùng* ledger kiểm tra (i) value grounding, (ii) đồng nhất thức kế toán $|f_c(\mathbf v)|>\tau_c$ *khi áp dụng được*, (iii) khớp phép toán; (tuỳ chọn) **tiered DPO** accuracy-first. Đây là nơi đồng nhất thức kế toán (bản cũ) thực sự hữu ích — như *verifier*, không phải tín hiệu xếp hạng. **Không đưa vào đóng góp chính.**
 
 ---
 
 ## 7. Thực nghiệm
 
-**Dữ liệu:** T²-RAGBench (FinQA 8,281 / ConvFinQA 3,458 / TAT-DQA 11,349; 7,317 context, unknown-context). **VAS tiếng Việt** = *case study* nhỏ về chuyển giao ngôn ngữ của concept canonicalization (không phải contribution riêng — review 1.6).
+**Dữ liệu:** T²-RAGBench (FinQA 8,281 / ConvFinQA 3,458 / TAT-DQA 11,349; **7,318 reports** — số chính thức; EDA dedup ra 7,317; unknown-context). **VAS tiếng Việt** = *case study* nhỏ (≤1–1.5 trang tổng với §6) về chuyển giao ngôn ngữ của concept canonicalization, mọi con số phải phục vụ câu chuyện LEDGER (review 1.5/1.6).
 
 **Baselines (sắc theo review 1.3):** BM25; **Hybrid BM25** (SOTA hiện tại); dense (BGE-M3, e5-large, text-embedding-3-large); **ColBERTv2**; reranker; HyDE; **Numbers Matter!**; và **baseline mạnh bắt buộc: dense + hard metadata-filter (company/year) + rerank** — để chứng minh *cổng mềm + masked-soft-fallback thắng filter cứng khi parse không hoàn hảo*.
 
@@ -142,16 +154,24 @@ Ngắn gọn, để cho thấy *tính tái dụng của ledger*: generator nhậ
 **Thí nghiệm chẩn đoán (kể "câu chuyện thắng" — review 1.3, 2):**
 - **Probe + variance** (§2) xác nhận cơ chế.
 - **Similarity-gap flip:** đo (đúng−sai) kỳ vọng lật từ **âm → dương**.
-- **Phân khúc khó:** *same-company-multi-year* và *high-numerical-density* — nơi gain phải đậm nhất (chuẩn bị tinh thần gain tổng khiêm tốn, thắng ở phân khúc).
+- **Phân khúc khó (vùng LEDGER thắng độc nhất — đóng khung novelty):** *intra-(company,year)* — cùng công ty & năm, phải chọn đúng metric/cell giữa ~40 số; **đây là nơi `dense + hard metadata-filter` KHÔNG giải được** (filter chỉ lọc tới công ty-năm, không phân biệt metric/cell bên trong), nên là vùng chứng minh giá trị của concept-channel + magnitude. Kèm *same-company-multi-year*, *query đa-kỳ/tính toán* (§5), *high-numerical-density*. (Chuẩn bị tinh thần gain tổng khiêm tốn, thắng ở phân khúc — review 1.5, 2-Q1.)
 - **Parser-noise ablation:** tiêm nhiễu vào intent parser, đo độ suy giảm (chứng minh soft fallback chống brittleness).
-- **Fact-extraction:** F1, oracle-vs-auto, extraction-to-retrieval correlation.
+- **Fact-extraction:** quan trọng nhất là **answer-fact recall** — ledger có chứa đúng *cell trả lời* không (review 2: bài *sống chết* ở đây), bên cạnh F1 tổng; **auto-fact vs oracle-fact gap** (nếu >10 MRR là báo động về tính thực tiễn); extraction-to-retrieval correlation; kèm 1 ví dụ bảng multi-level header lỗi + cách fallback xử lý.
+
+**Bốn câu rebuttal bắt buộc trả lời bằng số (review 2 — AC view):**
+1. LEDGER thắng bao nhiêu so với **dense + hard metadata-filter + reranker**? *(nếu sát nhau, gain phải đến từ intra-(company,year) ranking + query đa-kỳ — xem §5.)*
+2. Synthetic negatives có tạo **artifact dễ học** không? (đo bằng probe concept-only + ablation từng loại negative.)
+3. Filtered ANN có **giữ recall khi mask rất nhỏ** không? (đo recall theo cardinality bitmap; soft fallback kích hoạt khi nào.)
+4. **Auto-ledger vs oracle-ledger** gap bao nhiêu?
+
+**Khả thi của Masked HNSW (review 1.1):** đo (i) số lần gọi khoảng cách vs $\log N$ (bitset check không được phá tính logarithmic), (ii) latency vs ColBERTv2 & dense+hard-filter, (iii) biểu đồ latency theo corpus size để chứng minh **bounded latency** (không $\mathcal O(1)$).
 
 **Ablation (mỗi dòng ⇄ một thành phần):** − cổng E–T; − tách kênh magnitude; − fact-level→doc single-vector; − masked-index (về two-stage); − soft fallback; − từng loại negative (đặc biệt − metric-swap để lộ "học lười"); − reasoning-aware.
 
 ---
 
 ## 8. Định vị so với prior work
-| | Khóa E–T first-class | Số theo *độ lớn* | Negative true-by-construction | Scalable filtered index | Retriever (không phải reader) |
+| | Khóa E–T first-class | Số theo *độ lớn* | Answer-invalidating negatives | Scalable filtered index | Retriever (không phải reader) |
 |---|---|---|---|---|---|
 | Dense (BGE/e5/te-3) | ✗ | ✗ | ✗ | n/a | ✓ |
 | Hybrid BM25 (SOTA) | ✗ (token) | ✗ | ✗ | ✓ | ✓ |
@@ -190,6 +210,17 @@ Ngắn gọn, để cho thấy *tính tái dụng của ledger*: generator nhậ
 - **metadata-filter+dense** thành baseline bắt buộc + phân tích phân khúc (review 1.3).
 - **VAS → case study; generation → extension** (review 1.6).
 - **Title rút gọn**; bỏ $\mathcal O(1)$, dùng "bounded latency" (review 2).
+
+**Vòng 2 (review bản v2):**
+- **Bỏ chữ "provably"** → "answer-invalidating" + mệnh đề có *giả định ledger-answer* và xử lý query đa-fact (review 2 line 115).
+- **Pitch theo nguyên lý** "relevance is fact-indexed, not document-indexed"; đóng đinh novelty = *channel-aligned ledger-grounded negatives*, không phải masked HNSW (review 2 AC take + "tổ hợp kỹ thuật").
+- **Mềm hoá** "Chưa phương pháp nào"→"to our knowledge", "nhất thiết thua"→"khi nào", "không thể bị nhấn"→"less likely to be dominated" (review 2 edits line 10/50/63).
+- **Loss thêm $d^-_v$** cho nhất quán 5 loại negative (review 2 line 111).
+- **7,317→7,318** reports (review 2 line 136).
+- **§6 generation → Appendix/"downstream analysis"** (review 2 line 129).
+- **answer-fact recall** là metric extraction quan trọng nhất + **4 câu rebuttal** + **đo khả thi masked HNSW** (review 2 AC; review 1.1).
+- **metric-swap:** thêm kiểm tra trùng-giá-trị + thảo luận "học theo miền giá trị" (review 1.3).
+- **Đóng khung vùng thắng intra-(company,year)** để chống baseline dense+filter (review 1.5, 2-Q1).
 
 ## Tham chiếu chính
 T²-RAGBench (EACL'26) · Granularity Dilemma (Findings EMNLP'25) · Numeracy Gap (Findings EACL'26) · Numbers Matter! (Findings EMNLP'24) · ColBERT/ColBERTv2 · SoarGraph (WWW'23) · RocketQA, NV-Retriever (hard-negative/false-negative) · xVal · Information Bottleneck · FinQA/TAT-QA/ConvFinQA · DPO.
